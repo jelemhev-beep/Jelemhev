@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from .. import git_utils
+from .. import search as search_index
 from ..config import REPOS_DIR, TEMPLATES_DIR
 from ..db import get_connection
 from ..git_utils import GitError
@@ -157,6 +158,34 @@ async def create_repo(request: Request, name: str = Form(...), description: str 
     return RedirectResponse(f"/{user['username']}/{name}", status_code=303)
 
 
+@router.get("/search", response_class=HTMLResponse)
+async def search_page(request: Request, q: str = ""):
+    user = current_user(request)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    results = search_index.search(user["id"], user["username"], q) if q.strip() else []
+    return templates.TemplateResponse(
+        request, "search_results.html", {"user": user, "query": q, "results": results}
+    )
+
+
+@router.post("/reindex")
+async def reindex_all(request: Request):
+    user = current_user(request)
+    if user is None:
+        return RedirectResponse("/login", status_code=303)
+    conn = get_connection()
+    try:
+        repos = conn.execute(
+            "SELECT name FROM repositories WHERE owner_id = ?", (user["id"],)
+        ).fetchall()
+    finally:
+        conn.close()
+    for repo in repos:
+        search_index.index_repository(user["id"], user["username"], repo["name"])
+    return RedirectResponse("/", status_code=303)
+
+
 @router.get("/{owner}/{name}", response_class=HTMLResponse)
 async def repo_home(request: Request, owner: str, name: str):
     user = _require_owner(request, owner)
@@ -211,7 +240,7 @@ async def repo_tree(request: Request, owner: str, name: str, ref: str, subpath: 
 
 
 @router.get("/{owner}/{name}/blob/{ref}/{filepath:path}", response_class=HTMLResponse)
-async def repo_blob(request: Request, owner: str, name: str, ref: str, filepath: str):
+async def repo_blob(request: Request, owner: str, name: str, ref: str, filepath: str, line: int = 0):
     user = _require_owner(request, owner)
     repo = _get_repo_or_404(owner, name)
     repo_path = REPOS_DIR / owner / f"{name}.git"
@@ -228,6 +257,7 @@ async def repo_blob(request: Request, owner: str, name: str, ref: str, filepath:
             "branch": ref,
             "filepath": filepath,
             "content": content,
+            "highlight_line": line,
         },
     )
 

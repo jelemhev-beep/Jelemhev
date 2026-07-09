@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Recherche : {{ query }} - GitHome{% endblock %}
+{% block content %}
+<h1>Recherche</h1>
+{% if query %}
+<p class="muted">Resultats pour "{{ query }}"{% if results %} ({{ results|length }}){% endif %}</p>
+{% endif %}
+
+{% if results %}
+  {% for r in results %}
+  <div class="card">
+    <a href="/{{ user['username'] }}/{{ r.repo_name }}/blob/HEAD/{{ r.filepath }}{% if r.line_number %}?line={{ r.line_number }}{% endif %}">
+      <strong>{{ r.repo_name }}</strong> / {{ r.filepath }}{% if r.line_number %}<span class="muted">:{{ r.line_number }}</span>{% endif %}
+    </a>
+    {% if r.snippet %}<pre>{{ r.snippet }}</pre>{% endif %}
+  </div>
+  {% endfor %}
+{% elif query %}
+  <p class="muted">Aucun resultat. Pense a reindexer tes depots depuis le <a href="/">dashboard</a> si tu viens de pousser du code.</p>
+{% else %}
+  <p class="muted">Tape un mot-cle dans la barre de recherche en haut.</p>
+{% endif %}
+{% endblock %}

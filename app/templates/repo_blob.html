@@ -2,5 +2,12 @@
 {% block title %}{{ filepath }} - GitHome{% endblock %}
 {% block content %}
 <p class="breadcrumb"><a href="/{{ user['username'] }}/{{ repo['name'] }}">{{ repo["name"] }}</a> / {{ filepath }}</p>
-<pre>{{ content }}</pre>
+<table class="code">
+{% for line in content.splitlines() %}
+  <tr id="L{{ loop.index }}"{% if loop.index == highlight_line %} class="hl"{% endif %}>
+    <td class="lineno muted">{{ loop.index }}</td>
+    <td><pre>{{ line }}</pre></td>
+  </tr>
+{% endfor %}
+</table>
 {% endblock %}

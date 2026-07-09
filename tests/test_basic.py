@@ -1,5 +1,10 @@
+import subprocess
+
 from fastapi.testclient import TestClient
 
+from app import search as search_index
+from app.config import REPOS_DIR
+from app.db import get_connection
 from app.main import app
 
 
@@ -41,3 +46,34 @@ def test_login_wrong_password():
     client.get("/logout")
     resp = client.post("/login", data={"username": "carol", "password": "wrong"})
     assert resp.status_code == 401
+
+
+def test_search_finds_pushed_code_by_subword(tmp_path):
+    client = TestClient(app)
+    client.post("/register", data={"username": "dave", "password": "hunter22"})
+    resp = client.post("/repos/new", data={"name": "searchable", "description": ""}, follow_redirects=False)
+    assert resp.status_code == 303
+
+    repo_path = REPOS_DIR / "dave" / "searchable.git"
+    work = tmp_path / "work"
+    subprocess.run(["git", "clone", str(repo_path), str(work)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(work), "config", "user.email", "dave@example.com"], check=True)
+    subprocess.run(["git", "-C", str(work), "config", "user.name", "Dave"], check=True)
+    (work / "auth.py").write_text("def authenticate_user(username):\n    return True\n")
+    subprocess.run(["git", "-C", str(work), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(work), "commit", "-m", "add auth"], check=True)
+    subprocess.run(["git", "-C", str(work), "push", "origin", "HEAD:main"], check=True, capture_output=True)
+
+    conn = get_connection()
+    user_id = conn.execute("SELECT id FROM users WHERE username = ?", ("dave",)).fetchone()["id"]
+    conn.close()
+
+    assert search_index.index_repository(user_id, "dave", "searchable") == 1
+
+    # subword match: "authenticate" alone must find "authenticate_user"
+    results = search_index.search(user_id, "dave", "authenticate")
+    assert len(results) == 1
+    assert results[0]["repo_name"] == "searchable"
+    assert results[0]["filepath"] == "auth.py"
+
+    assert search_index.search(user_id, "dave", "nonexistentterm") == []

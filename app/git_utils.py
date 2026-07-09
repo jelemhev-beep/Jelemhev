@@ -73,6 +73,27 @@ def read_file(path: Path, ref: str, filepath: str) -> str:
     return _run(["show", f"{ref}:{filepath}"], cwd=path)
 
 
+def read_blob_bytes(path: Path, ref: str, filepath: str) -> bytes:
+    result = subprocess.run(["git", "show", f"{ref}:{filepath}"], cwd=path, capture_output=True)
+    if result.returncode != 0:
+        raise GitError(result.stderr.decode(errors="replace").strip())
+    return result.stdout
+
+
+def list_tree_recursive(path: Path, ref: str) -> list[tuple[str, str]]:
+    """All blobs (file, sha) reachable from ref, at any depth."""
+    out = _run(["ls-tree", "-r", ref], cwd=path)
+    files = []
+    for line in out.splitlines():
+        if not line:
+            continue
+        meta, name = line.split("\t", 1)
+        _mode, type_, sha = meta.split()
+        if type_ == "blob":
+            files.append((name, sha))
+    return files
+
+
 @dataclass
 class CommitInfo:
     sha: str

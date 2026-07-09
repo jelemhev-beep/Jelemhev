@@ -42,6 +42,15 @@ Git te demandera ton nom d'utilisateur/mot de passe (authentification HTTP
 Basic). Pour eviter de les retaper a chaque fois, utilise un credential
 helper git (`git config --global credential.helper store` ou `cache`).
 
+## Recherche de code
+
+Chaque `git push` reindexe automatiquement le depot concerne (index inverse
+maison, scoring TF-IDF, en `app/search.py`). La barre de recherche en haut de
+l'interface cherche dans tout ton code : identifiants entiers (`hash_token`)
+et sous-mots (`hash`, `token` retrouvent aussi `hash_token`). Si un depot a ete
+modifie autrement qu'avec un push HTTP (ex: manipulation directe des fichiers
+bare), utilise le bouton "Reindexer tous mes depots" du dashboard.
+
 ## Donnees
 
 Tout est stocke dans `./data/` (base SQLite + depots bare git), ignore par

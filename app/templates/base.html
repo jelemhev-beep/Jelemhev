@@ -11,6 +11,9 @@
     <a class="brand" href="/">GitHome</a>
     <nav>
       {% if user %}
+        <form class="searchbar" action="/search" method="get">
+          <input type="search" name="q" placeholder="Rechercher dans mon code..." value="{{ query if query is defined else '' }}">
+        </form>
         <span class="muted">{{ user["username"] }}</span>
         <a href="/logout">Deconnexion</a>
       {% else %}

@@ -18,6 +18,27 @@ CREATE TABLE IF NOT EXISTS repositories (
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(owner_id, name)
 );
+
+CREATE TABLE IF NOT EXISTS search_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    repo_name TEXT NOT NULL,
+    filepath TEXT NOT NULL,
+    blob_sha TEXT NOT NULL,
+    line_count INTEGER NOT NULL DEFAULT 0,
+    indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(owner_id, repo_name, filepath)
+);
+
+CREATE TABLE IF NOT EXISTS search_postings (
+    term TEXT NOT NULL,
+    document_id INTEGER NOT NULL REFERENCES search_documents(id) ON DELETE CASCADE,
+    line_number INTEGER NOT NULL,
+    UNIQUE(term, document_id, line_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_postings_term ON search_postings(term);
+CREATE INDEX IF NOT EXISTS idx_postings_doc ON search_postings(document_id);
 """
 
 

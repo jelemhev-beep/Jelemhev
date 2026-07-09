@@ -13,6 +13,12 @@
 </div>
 
 {% if repos %}
+<form method="post" action="/reindex" style="margin-bottom: 1rem;">
+  <button type="submit">Reindexer tous mes depots</button>
+</form>
+{% endif %}
+
+{% if repos %}
 <table>
   <thead><tr><th>Nom</th><th>Description</th><th>Cree le</th></tr></thead>
   <tbody>
