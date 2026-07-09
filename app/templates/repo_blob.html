@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ filepath }} - GitHome{% endblock %}
+{% block content %}
+<p class="breadcrumb"><a href="/{{ user['username'] }}/{{ repo['name'] }}">{{ repo["name"] }}</a> / {{ filepath }}</p>
+<pre>{{ content }}</pre>
+{% endblock %}

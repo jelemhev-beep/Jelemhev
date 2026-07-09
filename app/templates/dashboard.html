@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Mes depots - GitHome{% endblock %}
+{% block content %}
+<h1>Mes depots</h1>
+
+<div class="card">
+  <h3>Nouveau depot</h3>
+  <form class="stack" method="post" action="/repos/new">
+    <label>Nom<input type="text" name="name" required pattern="[A-Za-z0-9_.\-]+"></label>
+    <label>Description<input type="text" name="description"></label>
+    <button type="submit">Creer</button>
+  </form>
+</div>
+
+{% if repos %}
+<table>
+  <thead><tr><th>Nom</th><th>Description</th><th>Cree le</th></tr></thead>
+  <tbody>
+    {% for repo in repos %}
+    <tr>
+      <td><a href="/{{ user['username'] }}/{{ repo['name'] }}">{{ repo["name"] }}</a></td>
+      <td class="muted">{{ repo["description"] }}</td>
+      <td class="muted">{{ repo["created_at"] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">Aucun depot pour le moment.</p>
+{% endif %}
+{% endblock %}

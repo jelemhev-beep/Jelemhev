@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Inscription - GitHome{% endblock %}
+{% block content %}
+<h1>Creer le compte administrateur</h1>
+<p class="muted">Seul le premier compte peut s'inscrire ici. Les comptes suivants se creent avec <code>scripts/create_user.py</code>.</p>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form class="stack" method="post" action="/register">
+  <label>Nom d'utilisateur<input type="text" name="username" required autofocus></label>
+  <label>Mot de passe (8 car. min.)<input type="password" name="password" required></label>
+  <button type="submit">Creer le compte</button>
+</form>
+{% endblock %}

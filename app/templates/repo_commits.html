@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Commits {{ repo["name"] }} - GitHome{% endblock %}
+{% block content %}
+<p class="breadcrumb"><a href="/{{ user['username'] }}/{{ repo['name'] }}">{{ repo["name"] }}</a> / commits ({{ branch }})</p>
+<table>
+  {% for c in commits %}
+  <tr>
+    <td><a href="/{{ user['username'] }}/{{ repo['name'] }}/commit/{{ c.sha }}"><code>{{ c.short_sha }}</code></a></td>
+    <td>{{ c.message }}</td>
+    <td class="muted">{{ c.author }}</td>
+    <td class="muted">{{ c.date }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ sha[:7] }} - GitHome{% endblock %}
+{% block content %}
+<p class="breadcrumb"><a href="/{{ user['username'] }}/{{ repo['name'] }}">{{ repo["name"] }}</a> / commit <code>{{ sha[:7] }}</code></p>
+<pre>{{ diff }}</pre>
+{% endblock %}

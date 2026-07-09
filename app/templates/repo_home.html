@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ repo["name"] }} - GitHome{% endblock %}
+{% block content %}
+<div class="repo-header">
+  <h1>{{ user["username"] }} / {{ repo["name"] }}</h1>
+  {% if branch %}<a href="/{{ user['username'] }}/{{ repo['name'] }}/commits/{{ branch }}">Historique</a>{% endif %}
+</div>
+{% if repo["description"] %}<p class="muted">{{ repo["description"] }}</p>{% endif %}
+
+<div class="card">
+  <strong>Cloner :</strong>
+  <pre>git clone {{ clone_url }}</pre>
+</div>
+
+{% if not branch %}
+<p class="muted">Depot vide. Pousse ton premier commit :</p>
+<pre>git init
+git remote add origin {{ clone_url }}
+git add .
+git commit -m "premier commit"
+git push -u origin main</pre>
+{% elif error %}
+<p class="error">{{ error }}</p>
+{% else %}
+<h3>Fichiers ({{ branch }})</h3>
+<table>
+  {% for entry in entries %}
+  <tr>
+    <td>
+      {% if entry.type == "tree" %}
+      <a href="/{{ user['username'] }}/{{ repo['name'] }}/tree/{{ branch }}/{{ entry.name }}">{{ entry.name }}/</a>
+      {% else %}
+      <a href="/{{ user['username'] }}/{{ repo['name'] }}/blob/{{ branch }}/{{ entry.name }}">{{ entry.name }}</a>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h3>Derniers commits</h3>
+<table>
+  {% for c in commits %}
+  <tr>
+    <td><a href="/{{ user['username'] }}/{{ repo['name'] }}/commit/{{ c.sha }}"><code>{{ c.short_sha }}</code></a></td>
+    <td>{{ c.message }}</td>
+    <td class="muted">{{ c.author }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endblock %}

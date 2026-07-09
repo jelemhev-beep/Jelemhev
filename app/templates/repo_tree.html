@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ repo["name"] }}/{{ subpath }} - GitHome{% endblock %}
+{% block content %}
+<p class="breadcrumb"><a href="/{{ user['username'] }}/{{ repo['name'] }}">{{ repo["name"] }}</a> / {{ subpath }}</p>
+<table>
+  {% for entry in entries %}
+  <tr>
+    <td>
+      {% if entry.type == "tree" %}
+      <a href="/{{ user['username'] }}/{{ repo['name'] }}/tree/{{ branch }}/{{ subpath ~ '/' ~ entry.name if subpath else entry.name }}">{{ entry.name }}/</a>
+      {% else %}
+      <a href="/{{ user['username'] }}/{{ repo['name'] }}/blob/{{ branch }}/{{ subpath ~ '/' ~ entry.name if subpath else entry.name }}">{{ entry.name }}</a>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

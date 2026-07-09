@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Connexion - GitHome{% endblock %}
+{% block content %}
+<h1>Connexion</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form class="stack" method="post" action="/login">
+  <label>Nom d'utilisateur<input type="text" name="username" required autofocus></label>
+  <label>Mot de passe<input type="password" name="password" required></label>
+  <button type="submit">Se connecter</button>
+</form>
+<p class="muted"><a href="/register">Creer le premier compte</a></p>
+{% endblock %}
