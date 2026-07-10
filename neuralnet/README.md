@@ -61,6 +61,22 @@ matriciel vectorise, l'entrainement prendrait des heures. Augmente
 `TRAIN_LIMIT`/`TEST_LIMIT`/`EPOCHS` en tete de `examples/mnist.py` si tu as
 le temps (et la batterie).
 
+```bash
+python3 examples/mnist_improved.py
+```
+Version plus costaude (48 neurones caches, 5000 exemples, ~10 minutes
+d'entrainement) : **92.1%** de precision sur le test, contre 90.9% pour la
+version rapide. Sauvegarde le modele dans `mnist_model_v2.json`.
+
+```bash
+python3 examples/draw.py mnist_model_v2.json
+```
+Dessine un chiffre toi-meme dans le terminal (canvas ASCII 28x28, commandes
+`set`/`line`/`show`/`predict`) et regarde le reseau deviner en direct.
+Exemple reel avec `mnist_model_v2.json` : un "1" trace a main levee -> predit
+1 a 99.9%, un "2" -> predit 2 a 97.0%. Sans argument, charge
+`mnist_model.json` par defaut (genere par `examples/mnist.py`).
+
 ## Utiliser la bibliotheque
 
 ```python
