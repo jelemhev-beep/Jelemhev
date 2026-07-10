@@ -2,6 +2,7 @@
 operation is a manual nested loop, which is the point of this project.
 """
 
+import math
 import random
 
 
@@ -98,6 +99,21 @@ class Matrix:
 
     def sum(self) -> float:
         return sum(v for row in self.data for v in row)
+
+    def select_rows(self, indices: list[int]) -> "Matrix":
+        return Matrix([self.data[i] for i in indices])
+
+    def softmax_rows(self) -> "Matrix":
+        """Row-wise softmax. Not elementwise (each output depends on the
+        whole row), so it can't go through the generic Activation interface.
+        """
+        result = []
+        for row in self.data:
+            m = max(row)
+            exps = [math.exp(v - m) for v in row]
+            total = sum(exps)
+            result.append([e / total for e in exps])
+        return Matrix(result)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Matrix):

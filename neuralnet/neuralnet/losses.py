@@ -2,6 +2,7 @@
 to be fed straight into the last layer's backward() call.
 """
 
+import math
 from dataclasses import dataclass
 from typing import Callable
 
@@ -28,3 +29,25 @@ def _mse_derivative(prediction: Matrix, target: Matrix) -> Matrix:
 
 
 MSE = Loss("mse", _mse, _mse_derivative)
+
+
+def _cross_entropy(prediction: Matrix, target: Matrix) -> float:
+    eps = 1e-12
+    total = 0.0
+    for p_row, t_row in zip(prediction.data, target.data):
+        for p, t in zip(p_row, t_row):
+            total -= t * math.log(max(p, eps))
+    return total / prediction.rows
+
+
+def _cross_entropy_derivative(prediction: Matrix, target: Matrix) -> Matrix:
+    """Only valid when `prediction` is the output of a SOFTMAX layer: the
+    combined softmax+cross-entropy gradient simplifies to (prediction -
+    target) / batch_size. Pairing cross-entropy with any other output
+    activation would need a different derivative.
+    """
+    diff = prediction.sub(target)
+    return diff.scale(1.0 / prediction.rows)
+
+
+CROSS_ENTROPY = Loss("cross_entropy", _cross_entropy, _cross_entropy_derivative)

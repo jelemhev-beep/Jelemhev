@@ -1,3 +1,5 @@
+import random
+
 from neuralnet.activations import SIGMOID
 from neuralnet.layer import Dense
 from neuralnet.linalg import Matrix
@@ -6,6 +8,9 @@ from neuralnet.network import Network
 
 
 def _train_xor_network(seed_epochs: int = 5000) -> Network:
+    random.seed(0)  # deterministic weight init: this test asserts on
+    # convergence behaviour, not on backprop being merely present, so it
+    # shouldn't be at the mercy of how lucky the random init was.
     network = Network(
         layers=[
             Dense(2, 4, SIGMOID),

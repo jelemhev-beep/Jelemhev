@@ -57,4 +57,17 @@ TANH = Activation("tanh", _tanh, _tanh_derivative)
 RELU = Activation("relu", _relu, _relu_derivative)
 LINEAR = Activation("linear", _identity, _identity_derivative)
 
-BY_NAME = {a.name: a for a in (SIGMOID, TANH, RELU, LINEAR)}
+
+class Softmax:
+    """Marker type: softmax isn't elementwise (each output depends on the
+    whole row), so it can't share the plain Activation(fn, derivative)
+    interface. Only meaningful as the last layer, paired with
+    losses.CROSS_ENTROPY (see layer.Dense for the special-cased gradient).
+    """
+
+    name = "softmax"
+
+
+SOFTMAX = Softmax()
+
+BY_NAME = {a.name: a for a in (SIGMOID, TANH, RELU, LINEAR, SOFTMAX)}
