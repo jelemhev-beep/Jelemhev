@@ -24,3 +24,9 @@ def verify_password(password: str, stored: str) -> bool:
         return False
     dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, iterations)
     return hmac.compare_digest(dk, expected)
+
+
+# Fixed hash to check a password against when no such user exists, so that
+# an unknown username takes the same time to reject as a wrong password for
+# a real one (avoids a timing side-channel for username enumeration).
+DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-constant-time-rejection")

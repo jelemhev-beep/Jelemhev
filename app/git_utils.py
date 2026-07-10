@@ -57,7 +57,7 @@ class TreeEntry:
 
 def list_tree(path: Path, ref: str, subpath: str = "") -> list[TreeEntry]:
     target = f"{ref}:{subpath}" if subpath else f"{ref}:"
-    out = _run(["ls-tree", "-l", target], cwd=path)
+    out = _run(["ls-tree", "-l", "--end-of-options", target], cwd=path)
     entries = []
     for line in out.splitlines():
         if not line:
@@ -70,11 +70,13 @@ def list_tree(path: Path, ref: str, subpath: str = "") -> list[TreeEntry]:
 
 
 def read_file(path: Path, ref: str, filepath: str) -> str:
-    return _run(["show", f"{ref}:{filepath}"], cwd=path)
+    return _run(["show", "--end-of-options", f"{ref}:{filepath}"], cwd=path)
 
 
 def read_blob_bytes(path: Path, ref: str, filepath: str) -> bytes:
-    result = subprocess.run(["git", "show", f"{ref}:{filepath}"], cwd=path, capture_output=True)
+    result = subprocess.run(
+        ["git", "show", "--end-of-options", f"{ref}:{filepath}"], cwd=path, capture_output=True
+    )
     if result.returncode != 0:
         raise GitError(result.stderr.decode(errors="replace").strip())
     return result.stdout
@@ -82,7 +84,7 @@ def read_blob_bytes(path: Path, ref: str, filepath: str) -> bytes:
 
 def list_tree_recursive(path: Path, ref: str) -> list[tuple[str, str]]:
     """All blobs (file, sha) reachable from ref, at any depth."""
-    out = _run(["ls-tree", "-r", ref], cwd=path)
+    out = _run(["ls-tree", "-r", "--end-of-options", ref], cwd=path)
     files = []
     for line in out.splitlines():
         if not line:
@@ -112,6 +114,7 @@ def log(path: Path, ref: str = "HEAD", limit: int = 30, skip: int = 0) -> list[C
             f"--skip={skip}",
             "--date=iso-local",
             f"--pretty=format:{fmt}",
+            "--end-of-options",
             ref,
         ],
         cwd=path,
@@ -126,7 +129,7 @@ def log(path: Path, ref: str = "HEAD", limit: int = 30, skip: int = 0) -> list[C
 
 
 def show_commit(path: Path, sha: str) -> str:
-    return _run(["show", "--patch", "--stat", sha], cwd=path)
+    return _run(["show", "--patch", "--stat", "--end-of-options", sha], cwd=path)
 
 
 def repo_size_kb(path: Path) -> int:

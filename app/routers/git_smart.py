@@ -6,7 +6,7 @@ from .. import search as search_index
 from ..config import REPOS_DIR
 from ..db import get_connection
 from ..git_http import git_http_backend
-from ..security import verify_password
+from ..security import DUMMY_PASSWORD_HASH, verify_password
 
 router = APIRouter()
 
@@ -35,7 +35,9 @@ def _authenticate(request: Request):
     finally:
         conn.close()
 
-    if not row or not verify_password(password, row["password_hash"]):
+    password_hash = row["password_hash"] if row else DUMMY_PASSWORD_HASH
+    password_ok = verify_password(password, password_hash)
+    if not row or not password_ok:
         raise _unauthorized()
     return row
 

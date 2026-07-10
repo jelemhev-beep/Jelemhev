@@ -7,7 +7,7 @@ from .. import search as search_index
 from ..config import REPOS_DIR, TEMPLATES_DIR
 from ..db import get_connection
 from ..git_utils import GitError
-from ..security import hash_password, verify_password
+from ..security import DUMMY_PASSWORD_HASH, hash_password, verify_password
 
 router = APIRouter()
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -78,7 +78,9 @@ async def login_submit(request: Request, username: str = Form(...), password: st
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     finally:
         conn.close()
-    if not row or not verify_password(password, row["password_hash"]):
+    password_hash = row["password_hash"] if row else DUMMY_PASSWORD_HASH
+    password_ok = verify_password(password, password_hash)
+    if not row or not password_ok:
         return templates.TemplateResponse(
             request, "login.html", {"error": "Identifiants invalides"}, status_code=401
         )
