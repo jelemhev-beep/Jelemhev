@@ -1,10 +1,9 @@
 import sys
 
-from . import devis, digits, llm_cloud, llm_local, secondcerveau, voice
+from . import devis, digits, secondcerveau, voice
 
 HELP = """
 Commandes :
-  chat <message>                    parle avec l'IA (Groq si une cle est configuree, sinon Ollama local)
   projet <nom>                      change le projet actif (memoire separee par projet)
   note <titre>                      sauvegarde une note (contenu demande ensuite, ligne vide pour finir)
   notes [projet]                    liste les notes d'un projet (celui actif par defaut)
@@ -19,35 +18,33 @@ Commandes :
 
 MENU = """
 === MonIA ===
-  1) Discuter avec le LLM local
-  2) Changer de projet actif
-  3) Prendre une note
-  4) Voir mes notes
-  5) Rechercher dans le second cerveau
-  6) Calculer un devis
-  7) Voir les materiaux disponibles
-  8) Dessiner un chiffre (reconnaissance neuralnet)
-  9) Activer/desactiver la voix
+  1) Changer de projet actif
+  2) Prendre une note
+  3) Voir mes notes
+  4) Rechercher dans le second cerveau
+  5) Calculer un devis
+  6) Voir les materiaux disponibles
+  7) Dessiner un chiffre (reconnaissance neuralnet)
+  8) Activer/desactiver la voix
   0) Quitter
 
-Tape un numero, ou une commande complete (ex: "chat bonjour"). 'aide' pour revoir tout ca.
+Tape un numero, ou une commande complete (ex: "devis gravier 20"). 'aide' pour revoir tout ca.
 """
 
 # number -> (command, prompt). Commands needing no extra input aren't listed
 # here; they're handled directly in _expand_menu_choice.
 _PROMPTED_CHOICES = {
-    "1": ("chat", "Ton message : "),
-    "2": ("projet", "Nom du projet : "),
-    "3": ("note", "Titre de la note : "),
-    "5": ("recherche", "Terme a chercher : "),
-    "6": ("devis", "Materiau, surface en m2, epaisseur en cm (optionnel) : "),
-    "9": ("voix", "on ou off : "),
+    "1": ("projet", "Nom du projet : "),
+    "2": ("note", "Titre de la note : "),
+    "4": ("recherche", "Terme a chercher : "),
+    "5": ("devis", "Materiau, surface en m2, epaisseur en cm (optionnel) : "),
+    "8": ("voix", "on ou off : "),
 }
 _DIRECT_CHOICES = {
     "0": "quitter",
-    "4": "notes",
-    "7": "materiaux",
-    "8": "dessin",
+    "3": "notes",
+    "6": "materiaux",
+    "7": "dessin",
 }
 
 
@@ -55,7 +52,6 @@ class Session:
     def __init__(self):
         self.project = "General"
         self.voice_enabled = False
-        self.history: list[dict] = []
 
 
 def _expand_menu_choice(line: str, read_line) -> str:
@@ -108,48 +104,7 @@ def handle_command(session: Session, line: str, source=None) -> bool:
     elif cmd == "projet":
         if rest:
             session.project = rest
-            session.history = []
         print(f"Projet actif : {session.project}")
-
-    elif cmd == "chat":
-        if not rest:
-            print("Usage: chat <message>")
-            return True
-
-        session.history.append({"role": "user", "content": rest})
-        secondcerveau.append_conversation(session.project, "user", rest)
-
-        reply = None
-        if llm_cloud.has_api_key():
-            try:
-                reply = llm_cloud.chat(session.history)
-            except llm_cloud.GroqError as exc:
-                print(f"Erreur Groq: {exc}")
-                print("Repli sur le LLM local...")
-
-        if reply is None:
-            if not llm_local.is_available():
-                print("Ollama non joignable, tentative de demarrage automatique...")
-                if not llm_local.ensure_running():
-                    print(
-                        "Echec du demarrage automatique. Installe/lance Ollama toi-meme : "
-                        "`ollama serve &` puis `ollama pull llama3.2`."
-                    )
-                    session.history.pop()
-                    return True
-                print("Ollama est pret.")
-            try:
-                reply = llm_local.chat(session.history)
-            except llm_local.OllamaError as exc:
-                print(f"Erreur: {exc}")
-                session.history.pop()
-                return True
-
-        session.history.append({"role": "assistant", "content": reply})
-        secondcerveau.append_conversation(session.project, "assistant", reply)
-        print(reply)
-        if session.voice_enabled:
-            voice.speak(reply)
 
     elif cmd == "note":
         title = rest or "note"
@@ -245,22 +200,6 @@ def run(input_lines=None) -> None:
 
     print("MonIA - assistant personnel")
     print(MENU)
-
-    if llm_cloud.has_api_key():
-        print("(Chat : Groq configure, pas besoin d'Ollama)")
-    elif llm_local.is_available():
-        print("(Ollama deja disponible)")
-    elif llm_local.is_installed():
-        print("(Ollama installe mais pas lance, demarrage automatique...)")
-        if llm_local.ensure_running():
-            print("Ollama est pret.")
-        else:
-            print("Echec du demarrage automatique. Tu pourras reessayer avec 'chat'.")
-    else:
-        print(
-            "(Ollama n'est pas installe et aucune cle Groq configuree : "
-            "'chat' restera indisponible)"
-        )
 
     while True:
         try:

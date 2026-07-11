@@ -51,17 +51,3 @@ def test_search_scoped_to_one_project():
 
     assert len(secondcerveau.search("motcle")) == 2
     assert len(secondcerveau.search("motcle", project="Jardin")) == 1
-
-
-def test_append_and_load_conversation():
-    secondcerveau.append_conversation("Chat", "user", "bonjour")
-    secondcerveau.append_conversation("Chat", "assistant", "salut !")
-
-    log = secondcerveau.load_conversation("Chat")
-    assert "bonjour" in log
-    assert "salut !" in log
-    assert log.index("bonjour") < log.index("salut !")
-
-
-def test_load_conversation_missing_day_returns_empty():
-    assert secondcerveau.load_conversation("Chat", date="2000-01-01") == ""
