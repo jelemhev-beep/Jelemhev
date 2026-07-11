@@ -69,3 +69,24 @@ def search(query: str, project: str | None = None) -> list[tuple[Path, str]]:
                     results.append((path, line.strip()))
                     break
     return results
+
+
+def append_conversation(project: str, role: str, content: str) -> Path:
+    """Appends one chat turn to today's running conversation log for a
+    project, so chat exchanges become part of the same memory as notes
+    and devis results."""
+    project_dir = BRAIN_DIR / project
+    project_dir.mkdir(parents=True, exist_ok=True)
+    date = time.strftime("%Y-%m-%d")
+    path = project_dir / f"conversation-{date}.md"
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(f"\n**{role}** ({time.strftime('%H:%M:%S')}):\n{content}\n")
+    return path
+
+
+def load_conversation(project: str, date: str | None = None) -> str:
+    date = date or time.strftime("%Y-%m-%d")
+    path = BRAIN_DIR / project / f"conversation-{date}.md"
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8")

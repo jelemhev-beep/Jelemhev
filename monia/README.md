@@ -1,16 +1,22 @@
 # MonIA
 
 Un assistant personnel en ligne de commande : mémoire persistante (second
-cerveau), calculateur de devis, reconnaissance de chiffres dessinés (via
-`neuralnet`), et sortie vocale. Zéro dépendance externe — juste la
-bibliothèque standard Python.
+cerveau), chat avec une IA dans le cloud (Groq), calculateur de devis,
+reconnaissance de chiffres dessinés (via `neuralnet`), et sortie vocale.
+Zéro dépendance externe — juste la bibliothèque standard Python
+(`urllib`, `json`, `subprocess`).
 
 ## Les briques
 
-- **`monia/secondcerveau.py`** — mémoire persistante : notes stockées en
-  fichiers markdown lisibles, organisés par projet
-  (`~/.monia/secondcerveau/<Projet>/`). Pas de base de données — juste des
-  fichiers, faciles à relire, sauvegarder, ou pousser sur GitHome.
+- **`monia/secondcerveau.py`** — mémoire persistante : notes et
+  conversations stockées en fichiers markdown lisibles, organisés par
+  projet (`~/.monia/secondcerveau/<Projet>/`). Pas de base de données —
+  juste des fichiers, faciles à relire, sauvegarder, ou pousser sur
+  GitHome.
+- **`monia/llm_cloud.py`** — client pour l'API cloud de
+  [Groq](https://console.groq.com) : de vrais gros modèles (Llama 3.3
+  70B) qui tournent sur leurs serveurs, pas sur le téléphone. Gratuit
+  (clé API requise), et ne consomme ni RAM ni batterie du téléphone.
 - **`monia/devis.py`** — calculateur de devis matériaux (gravier, sable,
   béton...) : surface + épaisseur → volume, poids, prix estimé.
 - **`monia/voice.py`** — synthèse vocale via `termux-tts-speak` (app
@@ -28,7 +34,19 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-Aucune dépendance à installer.
+Aucune dépendance à installer pour MonIA lui-même.
+
+### Chat : Groq (cloud, gratuit, rapide)
+
+1. Crée un compte gratuit sur [console.groq.com](https://console.groq.com)
+2. Génère une clé API
+3. `export GROQ_API_KEY=ta_cle` (ajoute-la à `~/.bashrc` pour ne pas la
+   retaper à chaque fois)
+
+Aucune charge sur la RAM du téléphone : la question part sur internet, le
+modèle tourne chez Groq, seule la réponse revient. Sans clé configurée,
+tout le reste de MonIA fonctionne normalement — seule la commande `chat`
+reste indisponible.
 
 ## Utilisation
 
@@ -41,28 +59,35 @@ complète si tu préfères :
 
 ```
 === MonIA ===
-  1) Changer de projet actif
-  2) Prendre une note
-  3) Voir mes notes
-  4) Rechercher dans le second cerveau
-  5) Calculer un devis
-  6) Voir les materiaux disponibles
-  7) Dessiner un chiffre (reconnaissance neuralnet)
-  8) Activer/desactiver la voix
+  1) Discuter avec l'IA (Groq)
+  2) Changer de projet actif
+  3) Prendre une note
+  4) Voir mes notes
+  5) Rechercher dans le second cerveau
+  6) Calculer un devis
+  7) Voir les materiaux disponibles
+  8) Dessiner un chiffre (reconnaissance neuralnet)
+  9) Activer/desactiver la voix
   0) Quitter
 
-> 5
+> 6
 Materiau, surface en m2, epaisseur en cm (optionnel) : gravier 20 5
 Materiau      : gravier
 Surface       : 20 m2
 ...
+
+> 1
+Ton message : comment reussir une terrasse en bois ?
+...
 ```
 
-Les commandes complètes marchent toujours en parallèle du menu (`devis ...`,
-`dessin`, `voix on|off`, `note ...`, etc.) — tape `aide` pour tout revoir.
+Les commandes complètes marchent toujours en parallèle du menu (`chat ...`,
+`devis ...`, `dessin`, `voix on|off`, `note ...`, etc.) — tape `aide` pour
+tout revoir.
 
-Chaque `devis` et `dessin` reconnu est automatiquement sauvegardé dans le
-second cerveau du projet actif — rien ne se perd en fermant le terminal.
+Chaque `devis`, `chat` et `dessin` reconnu est automatiquement sauvegardé
+dans le second cerveau du projet actif — rien ne se perd en fermant le
+terminal.
 
 `dessin` nécessite que le projet `neuralnet` soit cloné juste à côté de
 `monia` (dossiers frères, comme dans ce dépôt) et qu'un modèle y ait été
@@ -75,5 +100,6 @@ pip install pytest
 pytest
 ```
 
-La CLI est testée de bout en bout : notes, devis, recherche, projets,
-dessin, et le menu numéroté.
+Le client Groq est testé contre un vrai serveur HTTP de test (pas un mock
+qui triche) imitant son API. La CLI est testée de bout en bout : chat,
+notes, devis, recherche, projets, dessin, et le menu numéroté.

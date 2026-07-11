@@ -1,4 +1,71 @@
-from monia import cli, secondcerveau
+import json
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+import pytest
+
+from monia import cli, llm_cloud, secondcerveau
+
+
+class _MockGroqHandler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_POST(self):
+        length = int(self.headers["Content-Length"])
+        payload = json.loads(self.rfile.read(length))
+        last_message = payload["messages"][-1]["content"]
+        self._json(
+            {"choices": [{"message": {"role": "assistant", "content": f"reponse a: {last_message}"}}]}
+        )
+
+    def _json(self, obj):
+        body = json.dumps(obj).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+@pytest.fixture
+def mock_groq(monkeypatch):
+    server = HTTPServer(("127.0.0.1", 0), _MockGroqHandler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-123")
+
+    original_chat = llm_cloud.chat  # capture before patching, or _chat below would call itself
+
+    def _chat(messages, model=llm_cloud.DEFAULT_MODEL, host=None, timeout=30.0, api_key=None):
+        return original_chat(
+            messages, model=model, host=f"http://127.0.0.1:{port}", timeout=timeout, api_key=api_key
+        )
+
+    monkeypatch.setattr(cli.llm_cloud, "chat", _chat)
+
+    yield
+    server.shutdown()
+    thread.join(timeout=2)
+
+
+def test_chat_command_gets_reply_and_saves_conversation(mock_groq, capsys):
+    cli.run(["chat bonjour", "quitter"])
+    out = capsys.readouterr().out
+    assert "reponse a: bonjour" in out
+
+    log = secondcerveau.load_conversation("General")
+    assert "bonjour" in log
+    assert "reponse a: bonjour" in log
+
+
+def test_chat_command_without_api_key_reports_clean_error(monkeypatch, capsys):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    cli.run(["chat bonjour", "quitter"])
+    out = capsys.readouterr().out
+    assert "console.groq.com" in out
 
 
 def test_devis_command_prints_and_saves_note(capsys):
