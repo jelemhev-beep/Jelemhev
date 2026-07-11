@@ -49,6 +49,21 @@ def test_run_predict_command_outputs_probabilities(capsys):
     assert "%" in out
 
 
+def test_run_calls_on_predict_callback_with_digit_and_confidence(capsys):
+    calls = []
+    run(_tiny_network(), ["set 5 5", "predict", "quit"], on_predict=lambda digit, conf: calls.append((digit, conf)))
+    assert len(calls) == 1
+    digit, confidence = calls[0]
+    assert 0 <= digit <= 9
+    assert 0.0 <= confidence <= 1.0
+
+
+def test_run_without_predict_never_calls_callback(capsys):
+    calls = []
+    run(_tiny_network(), ["set 5 5", "quit"], on_predict=lambda *a: calls.append(a))
+    assert calls == []
+
+
 def test_run_clear_and_unknown_command(capsys):
     run(_tiny_network(), ["set 1 1", "clear", "unknowncmd", "quit"])
     out = capsys.readouterr().out

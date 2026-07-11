@@ -1,6 +1,6 @@
 import sys
 
-from . import devis, llm_local, secondcerveau, voice
+from . import devis, digits, llm_local, secondcerveau, voice
 
 HELP = """
 Commandes :
@@ -11,6 +11,7 @@ Commandes :
   recherche <terme>                 cherche dans tout le second cerveau
   devis <materiau> <surface> [ep]   calcule un devis (epaisseur en cm, 5 par defaut)
   materiaux                         liste les materiaux disponibles pour devis
+  dessin [modele.json]              dessine un chiffre et demande au reseau neuralnet de le reconnaitre
   voix on|off                       active/desactive la sortie vocale (Termux:API)
   aide                              affiche ces commandes
   quitter                           quitte
@@ -24,8 +25,20 @@ class Session:
         self.history: list[dict] = []
 
 
-def handle_command(session: Session, line: str, read_line=input) -> bool:
-    """Returns False when the session should end."""
+def handle_command(session: Session, line: str, source=None) -> bool:
+    """Returns False when the session should end.
+
+    `source`: None for real interactive stdin, or a shared iterator over
+    upcoming commands (used by tests, and handed as-is to sub-loops like
+    'note' and 'dessin' so they keep consuming from the same stream
+    instead of a disconnected copy).
+    """
+
+    def read_line():
+        if source is not None:
+            return next(source)
+        return input()
+
     parts = line.split(maxsplit=1)
     cmd = parts[0].lower()
     rest = parts[1] if len(parts) > 1 else ""
@@ -113,6 +126,17 @@ def handle_command(session: Session, line: str, read_line=input) -> bool:
         print(text)
         secondcerveau.save_note(session.project, f"devis-{result.material}", text)
 
+    elif cmd == "dessin":
+        model_path = rest or None
+        try:
+            summary = digits.run_digit_session(model_path=model_path, input_lines=source)
+        except digits.NeuralnetUnavailable as exc:
+            print(f"Erreur: {exc}")
+            return True
+        if summary:
+            path = secondcerveau.save_note(session.project, "dessin-chiffre", summary)
+            print(f"(sauvegarde dans le second cerveau : {path})")
+
     elif cmd == "voix":
         if rest == "on":
             if voice.is_available():
@@ -152,7 +176,7 @@ def run(input_lines=None) -> None:
             break
         if not line:
             continue
-        if not handle_command(session, line, read_line):
+        if not handle_command(session, line, source):
             break
 
 

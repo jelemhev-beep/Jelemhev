@@ -87,9 +87,13 @@ def predict(network: Network, grid: list[list[float]]) -> tuple[list[int], list[
     return ranked, probs
 
 
-def run(network: Network, input_lines=None) -> None:
+def run(network: Network, input_lines=None, on_predict=None) -> None:
     """input_lines: optional list of commands, used by tests instead of
-    interactive stdin."""
+    interactive stdin.
+    on_predict: optional callback(digit: int, confidence: float) invoked
+    after every successful 'predict', so other tools (e.g. MonIA) can
+    react without duplicating this loop.
+    """
     grid = new_grid()
     source = iter(input_lines) if input_lines is not None else None
 
@@ -137,6 +141,8 @@ def run(network: Network, input_lines=None) -> None:
             for digit in ranked:
                 bar = "#" * int(probs[digit] * 40)
                 print(f"  {digit} : {probs[digit]:6.1%} {bar}")
+            if on_predict is not None:
+                on_predict(best, probs[best])
         else:
             print("Commande inconnue. Tape 'help'.")
 

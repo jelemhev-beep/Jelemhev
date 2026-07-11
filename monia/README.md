@@ -21,6 +21,10 @@ Python (`urllib`, `json`, `subprocess`).
   béton...) : surface + épaisseur → volume, poids, prix estimé.
 - **`monia/voice.py`** — synthèse vocale via `termux-tts-speak` (app
   Termux:API), toujours optionnelle.
+- **`monia/digits.py`** — pont vers le projet [`neuralnet`](../neuralnet)
+  (dossier frère dans le même dépôt) : réutilise son moteur de réseau de
+  neurones et son canvas de dessin ASCII pour reconnaître des chiffres
+  écrits à la main, directement depuis MonIA.
 - **`monia/cli.py`** — la boucle interactive qui relie tout.
 
 ## Installation
@@ -56,11 +60,20 @@ Ajouter un massif de fleurs
 > chat comment reussir une terrasse en bois ?
 > voix on
 > recherche terrasse
+> dessin
+line 4 14 23 14
+predict
+quit
 > quitter
 ```
 
-Chaque `devis` et chaque `chat` est automatiquement sauvegardé dans le
-second cerveau du projet actif — rien ne se perd en fermant le terminal.
+Chaque `devis`, `chat` et `dessin` reconnu est automatiquement sauvegardé
+dans le second cerveau du projet actif — rien ne se perd en fermant le
+terminal.
+
+`dessin` nécessite que le projet `neuralnet` soit cloné juste à côté de
+`monia` (dossiers frères, comme dans ce dépôt) et qu'un modèle y ait été
+entraîné (`neuralnet/examples/mnist.py` ou `mnist_improved.py`).
 
 ## Tests
 
