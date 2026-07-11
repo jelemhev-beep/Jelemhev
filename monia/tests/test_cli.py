@@ -61,6 +61,17 @@ def test_chat_command_gets_reply_and_saves_conversation(mock_groq, capsys):
     assert "reponse a: bonjour" in log
 
 
+def test_chat_stays_in_conversation_mode_across_messages(mock_groq, capsys):
+    """A follow-up message shouldn't need 'chat' retyped in front of it --
+    the CLI should keep answering until the user explicitly leaves chat
+    mode (this was the bug: freeform follow-ups got 'Commande inconnue')."""
+    cli.run(["chat bonjour", "comment ca va", "0", "quitter"])
+    out = capsys.readouterr().out
+    assert "reponse a: bonjour" in out
+    assert "reponse a: comment ca va" in out
+    assert "Commande inconnue" not in out
+
+
 def test_chat_command_without_api_key_reports_clean_error(monkeypatch, capsys):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     cli.run(["chat bonjour", "quitter"])

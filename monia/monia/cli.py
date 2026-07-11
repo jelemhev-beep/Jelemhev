@@ -4,7 +4,7 @@ from . import devis, digits, llm_cloud, secondcerveau, voice
 
 HELP = """
 Commandes :
-  chat <message>                    parle avec l'IA (Groq, necessite GROQ_API_KEY)
+  chat [message]                    parle avec l'IA (Groq) ; reste en mode chat jusqu'a 'quit'/'0'/ligne vide
   projet <nom>                      change le projet actif (memoire separee par projet)
   note <titre>                      sauvegarde une note (contenu demande ensuite, ligne vide pour finir)
   notes [projet]                    liste les notes d'un projet (celui actif par defaut)
@@ -112,10 +112,6 @@ def handle_command(session: Session, line: str, source=None) -> bool:
         print(f"Projet actif : {session.project}")
 
     elif cmd == "chat":
-        if not rest:
-            print("Usage: chat <message>")
-            return True
-
         if not llm_cloud.has_api_key():
             print(
                 "Aucune cle API Groq configuree. Cree un compte gratuit sur "
@@ -123,21 +119,37 @@ def handle_command(session: Session, line: str, source=None) -> bool:
             )
             return True
 
-        session.history.append({"role": "user", "content": rest})
-        secondcerveau.append_conversation(session.project, "user", rest)
+        print("(mode chat : ligne vide, 'quit' ou '0' pour revenir au menu)")
+        pending = rest
+        while True:
+            if pending:
+                message = pending
+                pending = ""
+            else:
+                print("Toi : ", end="")
+                try:
+                    message = read_line().strip()
+                except (EOFError, StopIteration):
+                    return False
 
-        try:
-            reply = llm_cloud.chat(session.history)
-        except llm_cloud.GroqError as exc:
-            print(f"Erreur Groq: {exc}")
-            session.history.pop()
-            return True
+            if not message or message.lower() in ("quit", "quitter", "exit", "stop", "menu", "0"):
+                break
 
-        session.history.append({"role": "assistant", "content": reply})
-        secondcerveau.append_conversation(session.project, "assistant", reply)
-        print(reply)
-        if session.voice_enabled:
-            voice.speak(reply)
+            session.history.append({"role": "user", "content": message})
+            secondcerveau.append_conversation(session.project, "user", message)
+
+            try:
+                reply = llm_cloud.chat(session.history)
+            except llm_cloud.GroqError as exc:
+                print(f"Erreur Groq: {exc}")
+                session.history.pop()
+                continue
+
+            session.history.append({"role": "assistant", "content": reply})
+            secondcerveau.append_conversation(session.project, "assistant", reply)
+            print(reply)
+            if session.voice_enabled:
+                voice.speak(reply)
 
     elif cmd == "note":
         title = rest or "note"

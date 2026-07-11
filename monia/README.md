@@ -48,6 +48,10 @@ modèle tourne chez Groq, seule la réponse revient. Sans clé configurée,
 tout le reste de MonIA fonctionne normalement — seule la commande `chat`
 reste indisponible.
 
+`chat` reste en mode conversation tant que tu ne tapes pas `quit`, `0` ou
+une ligne vide : pas besoin de retaper `chat` devant chaque message, tu
+peux enchaîner les phrases directement.
+
 ## Utilisation
 
 ```bash
