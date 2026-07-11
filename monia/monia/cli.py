@@ -1,10 +1,10 @@
 import sys
 
-from . import devis, digits, llm_cloud, secondcerveau, voice
+from . import devis, digits, llm_local, secondcerveau, voice
 
 HELP = """
 Commandes :
-  chat [message]                    parle avec l'IA (Groq) ; reste en mode chat jusqu'a 'quit'/'0'/ligne vide
+  chat [message]                    parle avec l'IA (Ollama local) ; reste en mode chat jusqu'a 'quit'/'0'/ligne vide
   parler                            comme 'chat' mais dicte au micro (Termux:API), reponses lues a voix haute
   projet <nom>                      change le projet actif (memoire separee par projet)
   note <titre>                      sauvegarde une note (contenu demande ensuite, ligne vide pour finir)
@@ -20,7 +20,7 @@ Commandes :
 
 MENU = """
 === MonIA ===
-  1) Discuter avec l'IA (Groq)
+  1) Discuter avec l'IA (Ollama local)
   2) Parler a l'IA au micro (dictee vocale)
   3) Changer de projet actif
   4) Prendre une note
@@ -64,8 +64,33 @@ class Session:
         self.history: list[dict] = []
 
 
+def _ensure_ollama_ready() -> bool:
+    """Prints a clear message and returns False if Ollama isn't usable;
+    tries to auto-start it first if it's installed but not running."""
+    if llm_local.is_available():
+        return True
+    if not llm_local.is_installed():
+        print(
+            "Ollama n'est pas installe. Installe-le : "
+            "curl -fsSL https://ollama.com/install.sh | sh "
+            f"puis: ollama pull {llm_local.DEFAULT_MODEL}"
+        )
+        return False
+
+    print("Ollama n'est pas demarre, tentative de demarrage automatique...")
+    if llm_local.ensure_running():
+        print("Ollama est pret.")
+        return True
+
+    print(
+        "Echec du demarrage automatique. Lance-le toi-meme (`ollama serve &`) "
+        f"et verifie que le modele est installe (`ollama pull {llm_local.DEFAULT_MODEL}`)."
+    )
+    return False
+
+
 def _send_and_reply(session: Session, message: str) -> str | None:
-    """Sends one user message to Groq, keeping session.history and the
+    """Sends one user message to Ollama, keeping session.history and the
     second-brain conversation log in sync. Returns the reply, or None if
     the call failed (after printing the error and rolling back the
     pending history entry so a retry doesn't duplicate it)."""
@@ -73,9 +98,9 @@ def _send_and_reply(session: Session, message: str) -> str | None:
     secondcerveau.append_conversation(session.project, "user", message)
 
     try:
-        reply = llm_cloud.chat(session.history)
-    except llm_cloud.GroqError as exc:
-        print(f"Erreur Groq: {exc}")
+        reply = llm_local.chat(session.history)
+    except llm_local.OllamaError as exc:
+        print(f"Erreur: {exc}")
         session.history.pop()
         return None
 
@@ -138,11 +163,7 @@ def handle_command(session: Session, line: str, source=None) -> bool:
         print(f"Projet actif : {session.project}")
 
     elif cmd == "chat":
-        if not llm_cloud.has_api_key():
-            print(
-                "Aucune cle API Groq configuree. Cree un compte gratuit sur "
-                "console.groq.com, genere une cle, puis: export GROQ_API_KEY=ta_cle"
-            )
+        if not _ensure_ollama_ready():
             return True
 
         print("(mode chat : ligne vide, 'quit' ou '0' pour revenir au menu)")
@@ -169,11 +190,7 @@ def handle_command(session: Session, line: str, source=None) -> bool:
                 voice.speak(reply)
 
     elif cmd == "parler":
-        if not llm_cloud.has_api_key():
-            print(
-                "Aucune cle API Groq configuree. Cree un compte gratuit sur "
-                "console.groq.com, genere une cle, puis: export GROQ_API_KEY=ta_cle"
-            )
+        if not _ensure_ollama_ready():
             return True
         if not voice.is_stt_available():
             print("termux-speech-to-text introuvable (installe l'app Termux:API).")
@@ -292,10 +309,12 @@ def run(input_lines=None) -> None:
     print("MonIA - assistant personnel")
     print(MENU)
 
-    if llm_cloud.has_api_key():
-        print("(Chat : Groq configure et pret)")
+    if llm_local.is_available():
+        print("(Ollama deja disponible)")
+    elif llm_local.is_installed():
+        print("(Ollama installe mais pas lance, demarrage automatique au premier chat)")
     else:
-        print("(Aucune cle GROQ_API_KEY : 'chat' restera indisponible)")
+        print("(Ollama n'est pas installe : 'chat'/'parler' resteront indisponibles)")
 
     while True:
         try:

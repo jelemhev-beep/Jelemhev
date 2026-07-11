@@ -1,10 +1,11 @@
 # MonIA
 
 Un assistant personnel en ligne de commande : mémoire persistante (second
-cerveau), chat avec une IA dans le cloud (Groq) — au clavier ou dicté au
+cerveau), chat avec une IA locale (Ollama) — au clavier ou dicté au
 micro —, calculateur de devis, reconnaissance de chiffres dessinés (via
-`neuralnet`), et sortie vocale. Zéro dépendance externe — juste la
-bibliothèque standard Python (`urllib`, `json`, `subprocess`).
+`neuralnet`), et sortie vocale. Zéro dépendance externe pour MonIA
+lui-même — juste la bibliothèque standard Python (`urllib`, `json`,
+`subprocess`).
 
 ## Les briques
 
@@ -13,10 +14,10 @@ bibliothèque standard Python (`urllib`, `json`, `subprocess`).
   projet (`~/.monia/secondcerveau/<Projet>/`). Pas de base de données —
   juste des fichiers, faciles à relire, sauvegarder, ou pousser sur
   GitHome.
-- **`monia/llm_cloud.py`** — client pour l'API cloud de
-  [Groq](https://console.groq.com) : de vrais gros modèles (Llama 3.3
-  70B) qui tournent sur leurs serveurs, pas sur le téléphone. Gratuit
-  (clé API requise), et ne consomme ni RAM ni batterie du téléphone.
+- **`monia/llm_local.py`** — client pour un modèle pré-entraîné servi par
+  [Ollama](https://ollama.com) en local, entièrement gratuit et sans
+  limite d'utilisation, mais borné par la RAM du téléphone — voir la
+  section RAM plus bas.
 - **`monia/devis.py`** — calculateur de devis matériaux (gravier, sable,
   béton...) : surface + épaisseur → volume, poids, prix estimé.
 - **`monia/voice.py`** — synthèse vocale (`termux-tts-speak`) et
@@ -37,17 +38,31 @@ source .venv/bin/activate
 
 Aucune dépendance à installer pour MonIA lui-même.
 
-### Chat : Groq (cloud, gratuit, rapide)
+### Chat : Ollama (local, gratuit, sans limite)
 
-1. Crée un compte gratuit sur [console.groq.com](https://console.groq.com)
-2. Génère une clé API
-3. `export GROQ_API_KEY=ta_cle` (ajoute-la à `~/.bashrc` pour ne pas la
-   retaper à chaque fois)
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen2.5:1.5b
+```
 
-Aucune charge sur la RAM du téléphone : la question part sur internet, le
-modèle tourne chez Groq, seule la réponse revient. Sans clé configurée,
-tout le reste de MonIA fonctionne normalement — seules les commandes
-`chat` et `parler` restent indisponibles.
+Pas besoin de lancer `ollama serve` toi-même : MonIA détecte qu'Ollama
+n'est pas démarré et le lance automatiquement en arrière-plan au premier
+`chat` (et retente si besoin). Ça ne survit pas à Android qui tue les
+processus en arrière-plan après un long moment d'inactivité — dans ce
+cas MonIA le relance automatiquement.
+
+**Attention à la RAM** : un modèle local, même petit, prend facilement
+1 à 1.5 Go. Vérifie ce qu'il te reste avec `free -h` avant de choisir la
+taille du modèle. Le modèle par défaut (`qwen2.5:1.5b`) est un compromis
+volontaire entre qualité et légèreté — sur un téléphone avec très peu de
+RAM disponible, préfère un modèle encore plus petit
+(`export MONIA_MODEL=qwen2.5:0.5b`), au prix de réponses moins bonnes ;
+avec plus de marge, un modèle plus gros répondra mieux
+(`export MONIA_MODEL=llama3.2`).
+
+Sans Ollama installé ou sans RAM suffisante pour le faire tourner, tout
+le reste de MonIA fonctionne normalement — seules les commandes `chat`
+et `parler` restent indisponibles.
 
 `chat` reste en mode conversation tant que tu ne tapes pas `quit`, `0` ou
 une ligne vide : pas besoin de retaper `chat` devant chaque message, tu
@@ -73,7 +88,7 @@ complète si tu préfères :
 
 ```
 === MonIA ===
-  1) Discuter avec l'IA (Groq)
+  1) Discuter avec l'IA (Ollama local)
   2) Parler a l'IA au micro (dictee vocale)
   3) Changer de projet actif
   4) Prendre une note
@@ -115,7 +130,7 @@ pip install pytest
 pytest
 ```
 
-Le client Groq est testé contre un vrai serveur HTTP de test (pas un mock
-qui triche) imitant son API. La CLI est testée de bout en bout : chat,
-dictée vocale, notes, devis, recherche, projets, dessin, et le menu
-numéroté.
+Le client Ollama est testé contre un vrai serveur HTTP de test (pas un
+mock qui triche) imitant son API, y compris le démarrage automatique
+(`ensure_running`). La CLI est testée de bout en bout : chat, dictée
+vocale, notes, devis, recherche, projets, dessin, et le menu numéroté.

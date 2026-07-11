@@ -4,20 +4,21 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from monia import cli, llm_cloud, secondcerveau
+from monia import cli, llm_local, secondcerveau
 
 
-class _MockGroqHandler(BaseHTTPRequestHandler):
+class _MockOllamaHandler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
+
+    def do_GET(self):
+        self._json({"models": [{"name": "qwen2.5:1.5b"}]})
 
     def do_POST(self):
         length = int(self.headers["Content-Length"])
         payload = json.loads(self.rfile.read(length))
         last_message = payload["messages"][-1]["content"]
-        self._json(
-            {"choices": [{"message": {"role": "assistant", "content": f"reponse a: {last_message}"}}]}
-        )
+        self._json({"message": {"role": "assistant", "content": f"reponse a: {last_message}"}})
 
     def _json(self, obj):
         body = json.dumps(obj).encode()
@@ -29,29 +30,26 @@ class _MockGroqHandler(BaseHTTPRequestHandler):
 
 
 @pytest.fixture
-def mock_groq(monkeypatch):
-    server = HTTPServer(("127.0.0.1", 0), _MockGroqHandler)
+def mock_ollama(monkeypatch):
+    server = HTTPServer(("127.0.0.1", 0), _MockOllamaHandler)
     port = server.server_address[1]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    monkeypatch.setenv("GROQ_API_KEY", "test-key-123")
+    original_chat = llm_local.chat  # capture before patching, or _chat below would call itself
 
-    original_chat = llm_cloud.chat  # capture before patching, or _chat below would call itself
+    def _chat(messages, model=None, host=None, timeout=120.0):
+        return original_chat(messages, model=model, host=f"http://127.0.0.1:{port}", timeout=timeout)
 
-    def _chat(messages, model=llm_cloud.DEFAULT_MODEL, host=None, timeout=30.0, api_key=None):
-        return original_chat(
-            messages, model=model, host=f"http://127.0.0.1:{port}", timeout=timeout, api_key=api_key
-        )
-
-    monkeypatch.setattr(cli.llm_cloud, "chat", _chat)
+    monkeypatch.setattr(cli.llm_local, "chat", _chat)
+    monkeypatch.setattr(cli.llm_local, "is_available", lambda **kw: True)
 
     yield
     server.shutdown()
     thread.join(timeout=2)
 
 
-def test_chat_command_gets_reply_and_saves_conversation(mock_groq, capsys):
+def test_chat_command_gets_reply_and_saves_conversation(mock_ollama, capsys):
     cli.run(["chat bonjour", "quitter"])
     out = capsys.readouterr().out
     assert "reponse a: bonjour" in out
@@ -61,7 +59,7 @@ def test_chat_command_gets_reply_and_saves_conversation(mock_groq, capsys):
     assert "reponse a: bonjour" in log
 
 
-def test_chat_stays_in_conversation_mode_across_messages(mock_groq, capsys):
+def test_chat_stays_in_conversation_mode_across_messages(mock_ollama, capsys):
     """A follow-up message shouldn't need 'chat' retyped in front of it --
     the CLI should keep answering until the user explicitly leaves chat
     mode (this was the bug: freeform follow-ups got 'Commande inconnue')."""
@@ -72,14 +70,15 @@ def test_chat_stays_in_conversation_mode_across_messages(mock_groq, capsys):
     assert "Commande inconnue" not in out
 
 
-def test_chat_command_without_api_key_reports_clean_error(monkeypatch, capsys):
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+def test_chat_command_without_ollama_reports_clean_error(monkeypatch, capsys):
+    monkeypatch.setattr(cli.llm_local, "is_available", lambda **kw: False)
+    monkeypatch.setattr(cli.llm_local, "is_installed", lambda: False)
     cli.run(["chat bonjour", "quitter"])
     out = capsys.readouterr().out
-    assert "console.groq.com" in out
+    assert "ollama.com/install.sh" in out
 
 
-def test_parler_command_uses_speech_to_text_and_speaks_reply(monkeypatch, mock_groq, capsys):
+def test_parler_command_uses_speech_to_text_and_speaks_reply(monkeypatch, mock_ollama, capsys):
     monkeypatch.setattr(cli.voice, "is_stt_available", lambda: True)
     responses = iter(["bonjour", "stop"])
     monkeypatch.setattr(cli.voice, "listen", lambda timeout=30.0: next(responses))
@@ -92,15 +91,14 @@ def test_parler_command_uses_speech_to_text_and_speaks_reply(monkeypatch, mock_g
     assert spoken == ["reponse a: bonjour"]
 
 
-def test_parler_command_without_stt_reports_clean_error(monkeypatch, capsys):
-    monkeypatch.setenv("GROQ_API_KEY", "whatever")
+def test_parler_command_without_stt_reports_clean_error(monkeypatch, mock_ollama, capsys):
     monkeypatch.setattr(cli.voice, "is_stt_available", lambda: False)
     cli.run(["parler", "quitter"])
     out = capsys.readouterr().out
     assert "termux-speech-to-text" in out
 
 
-def test_parler_command_retries_on_unrecognized_speech(monkeypatch, mock_groq, capsys):
+def test_parler_command_retries_on_unrecognized_speech(monkeypatch, mock_ollama, capsys):
     responses = iter(["", "salut", "stop"])
     monkeypatch.setattr(cli.voice, "is_stt_available", lambda: True)
     monkeypatch.setattr(cli.voice, "listen", lambda timeout=30.0: next(responses))
