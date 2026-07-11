@@ -79,6 +79,39 @@ def test_chat_command_without_api_key_reports_clean_error(monkeypatch, capsys):
     assert "console.groq.com" in out
 
 
+def test_parler_command_uses_speech_to_text_and_speaks_reply(monkeypatch, mock_groq, capsys):
+    monkeypatch.setattr(cli.voice, "is_stt_available", lambda: True)
+    responses = iter(["bonjour", "stop"])
+    monkeypatch.setattr(cli.voice, "listen", lambda timeout=30.0: next(responses))
+    spoken = []
+    monkeypatch.setattr(cli.voice, "speak", lambda text: spoken.append(text) or True)
+
+    cli.run(["parler", "quitter"])
+    out = capsys.readouterr().out
+    assert "reponse a: bonjour" in out
+    assert spoken == ["reponse a: bonjour"]
+
+
+def test_parler_command_without_stt_reports_clean_error(monkeypatch, capsys):
+    monkeypatch.setenv("GROQ_API_KEY", "whatever")
+    monkeypatch.setattr(cli.voice, "is_stt_available", lambda: False)
+    cli.run(["parler", "quitter"])
+    out = capsys.readouterr().out
+    assert "termux-speech-to-text" in out
+
+
+def test_parler_command_retries_on_unrecognized_speech(monkeypatch, mock_groq, capsys):
+    responses = iter(["", "salut", "stop"])
+    monkeypatch.setattr(cli.voice, "is_stt_available", lambda: True)
+    monkeypatch.setattr(cli.voice, "listen", lambda timeout=30.0: next(responses))
+    monkeypatch.setattr(cli.voice, "speak", lambda text: True)
+
+    cli.run(["parler", "quitter"])
+    out = capsys.readouterr().out
+    assert "rien compris" in out.lower()
+    assert "reponse a: salut" in out
+
+
 def test_devis_command_prints_and_saves_note(capsys):
     cli.run(["devis gravier 10 5", "quitter"])
     out = capsys.readouterr().out

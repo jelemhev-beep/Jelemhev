@@ -5,6 +5,7 @@ from . import devis, digits, llm_cloud, secondcerveau, voice
 HELP = """
 Commandes :
   chat [message]                    parle avec l'IA (Groq) ; reste en mode chat jusqu'a 'quit'/'0'/ligne vide
+  parler                            comme 'chat' mais dicte au micro (Termux:API), reponses lues a voix haute
   projet <nom>                      change le projet actif (memoire separee par projet)
   note <titre>                      sauvegarde une note (contenu demande ensuite, ligne vide pour finir)
   notes [projet]                    liste les notes d'un projet (celui actif par defaut)
@@ -20,34 +21,39 @@ Commandes :
 MENU = """
 === MonIA ===
   1) Discuter avec l'IA (Groq)
-  2) Changer de projet actif
-  3) Prendre une note
-  4) Voir mes notes
-  5) Rechercher dans le second cerveau
-  6) Calculer un devis
-  7) Voir les materiaux disponibles
-  8) Dessiner un chiffre (reconnaissance neuralnet)
-  9) Activer/desactiver la voix
+  2) Parler a l'IA au micro (dictee vocale)
+  3) Changer de projet actif
+  4) Prendre une note
+  5) Voir mes notes
+  6) Rechercher dans le second cerveau
+  7) Calculer un devis
+  8) Voir les materiaux disponibles
+  9) Dessiner un chiffre (reconnaissance neuralnet)
+  10) Activer/desactiver la voix
   0) Quitter
 
 Tape un numero, ou une commande complete (ex: "chat bonjour"). 'aide' pour revoir tout ca.
 """
 
+# words that end a chat/parler conversation loop and return to the main menu
+_CHAT_EXIT_WORDS = ("quit", "quitter", "exit", "stop", "menu", "0")
+
 # number -> (command, prompt). Commands needing no extra input aren't listed
 # here; they're handled directly in _expand_menu_choice.
 _PROMPTED_CHOICES = {
     "1": ("chat", "Ton message : "),
-    "2": ("projet", "Nom du projet : "),
-    "3": ("note", "Titre de la note : "),
-    "5": ("recherche", "Terme a chercher : "),
-    "6": ("devis", "Materiau, surface en m2, epaisseur en cm (optionnel) : "),
-    "9": ("voix", "on ou off : "),
+    "3": ("projet", "Nom du projet : "),
+    "4": ("note", "Titre de la note : "),
+    "6": ("recherche", "Terme a chercher : "),
+    "7": ("devis", "Materiau, surface en m2, epaisseur en cm (optionnel) : "),
+    "10": ("voix", "on ou off : "),
 }
 _DIRECT_CHOICES = {
     "0": "quitter",
-    "4": "notes",
-    "7": "materiaux",
-    "8": "dessin",
+    "2": "parler",
+    "5": "notes",
+    "8": "materiaux",
+    "9": "dessin",
 }
 
 
@@ -56,6 +62,26 @@ class Session:
         self.project = "General"
         self.voice_enabled = False
         self.history: list[dict] = []
+
+
+def _send_and_reply(session: Session, message: str) -> str | None:
+    """Sends one user message to Groq, keeping session.history and the
+    second-brain conversation log in sync. Returns the reply, or None if
+    the call failed (after printing the error and rolling back the
+    pending history entry so a retry doesn't duplicate it)."""
+    session.history.append({"role": "user", "content": message})
+    secondcerveau.append_conversation(session.project, "user", message)
+
+    try:
+        reply = llm_cloud.chat(session.history)
+    except llm_cloud.GroqError as exc:
+        print(f"Erreur Groq: {exc}")
+        session.history.pop()
+        return None
+
+    session.history.append({"role": "assistant", "content": reply})
+    secondcerveau.append_conversation(session.project, "assistant", reply)
+    return reply
 
 
 def _expand_menu_choice(line: str, read_line) -> str:
@@ -132,24 +158,44 @@ def handle_command(session: Session, line: str, source=None) -> bool:
                 except (EOFError, StopIteration):
                     return False
 
-            if not message or message.lower() in ("quit", "quitter", "exit", "stop", "menu", "0"):
+            if not message or message.lower() in _CHAT_EXIT_WORDS:
                 break
 
-            session.history.append({"role": "user", "content": message})
-            secondcerveau.append_conversation(session.project, "user", message)
-
-            try:
-                reply = llm_cloud.chat(session.history)
-            except llm_cloud.GroqError as exc:
-                print(f"Erreur Groq: {exc}")
-                session.history.pop()
+            reply = _send_and_reply(session, message)
+            if reply is None:
                 continue
-
-            session.history.append({"role": "assistant", "content": reply})
-            secondcerveau.append_conversation(session.project, "assistant", reply)
             print(reply)
             if session.voice_enabled:
                 voice.speak(reply)
+
+    elif cmd == "parler":
+        if not llm_cloud.has_api_key():
+            print(
+                "Aucune cle API Groq configuree. Cree un compte gratuit sur "
+                "console.groq.com, genere une cle, puis: export GROQ_API_KEY=ta_cle"
+            )
+            return True
+        if not voice.is_stt_available():
+            print("termux-speech-to-text introuvable (installe l'app Termux:API).")
+            return True
+
+        print("(mode vocal : parle, dis 'stop' pour revenir au menu)")
+        while True:
+            print("Ecoute...")
+            message = voice.listen()
+            if not message:
+                print("(rien compris, reessaie ou dis 'stop')")
+                continue
+
+            print(f"Toi (voix) : {message}")
+            if message.lower() in _CHAT_EXIT_WORDS:
+                break
+
+            reply = _send_and_reply(session, message)
+            if reply is None:
+                continue
+            print(reply)
+            voice.speak(reply)
 
     elif cmd == "note":
         title = rest or "note"

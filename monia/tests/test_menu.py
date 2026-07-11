@@ -64,16 +64,27 @@ def test_menu_choice_1_chats(mock_groq, capsys):
     assert "reponse a: salut" in out
 
 
-def test_menu_choice_6_calculates_devis(capsys):
-    cli.run(["6", "gravier 15 5", "0"])
+def test_menu_choice_2_talks_by_voice(monkeypatch, mock_groq, capsys):
+    monkeypatch.setattr(cli.voice, "is_stt_available", lambda: True)
+    responses = iter(["salut", "stop"])
+    monkeypatch.setattr(cli.voice, "listen", lambda timeout=30.0: next(responses))
+    monkeypatch.setattr(cli.voice, "speak", lambda text: True)
+
+    cli.run(["2", "0"])
+    out = capsys.readouterr().out
+    assert "reponse a: salut" in out
+
+
+def test_menu_choice_7_calculates_devis(capsys):
+    cli.run(["7", "gravier 15 5", "0"])
     out = capsys.readouterr().out
     assert "gravier" in out
     assert "tonnes" in out
 
 
-def test_menu_choice_4_lists_notes(capsys):
+def test_menu_choice_5_lists_notes(capsys):
     secondcerveau.save_note("General", "test", "contenu")
-    cli.run(["4", "0"])
+    cli.run(["5", "0"])
     out = capsys.readouterr().out
     assert "test" in out.lower() or ".md" in out
 
