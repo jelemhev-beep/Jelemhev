@@ -1,9 +1,9 @@
 # MonIA
 
 Un assistant personnel en ligne de commande : mémoire persistante (second
-cerveau), chat avec un vrai LLM local (Ollama), calculateur de devis, et
-sortie vocale. Zéro dépendance externe — juste la bibliothèque standard
-Python (`urllib`, `json`, `subprocess`).
+cerveau), chat avec une IA (dans le cloud via Groq, ou en local via
+Ollama), calculateur de devis, et sortie vocale. Zéro dépendance externe
+— juste la bibliothèque standard Python (`urllib`, `json`, `subprocess`).
 
 ## Les briques
 
@@ -12,11 +12,16 @@ Python (`urllib`, `json`, `subprocess`).
   projet (`~/.monia/secondcerveau/<Projet>/`). Pas de base de données —
   juste des fichiers, faciles à relire, sauvegarder, ou pousser sur
   GitHome.
-- **`monia/llm_local.py`** — client pour un vrai modèle pré-entraîné servi
-  par [Ollama](https://ollama.com) en local (`llama3.2`, `phi3`, etc.).
-  Ce n'est pas un LLM fait maison : entraîner un vrai modèle de langage
-  from scratch n'est pas réaliste sur un téléphone. Ollama fait tourner le
-  modèle, MonIA parle juste à son API REST.
+- **`monia/llm_cloud.py`** — client pour l'API cloud de
+  [Groq](https://console.groq.com) : de vrais gros modèles (Llama 3.3
+  70B) qui tournent sur leurs serveurs, pas sur le téléphone. Gratuit
+  (clé API requise), et bien plus capable qu'un modèle local — utilisé
+  en priorité si `GROQ_API_KEY` est configuree.
+- **`monia/llm_local.py`** — client pour un modèle pré-entraîné servi par
+  [Ollama](https://ollama.com) en local (`llama3.2`, `qwen2.5`, etc.),
+  utilisé en repli si aucune clé Groq n'est configurée. Un téléphone n'a
+  généralement pas assez de RAM pour un modèle local vraiment capable —
+  voir la section RAM plus bas.
 - **`monia/devis.py`** — calculateur de devis matériaux (gravier, sable,
   béton...) : surface + épaisseur → volume, poids, prix estimé.
 - **`monia/voice.py`** — synthèse vocale via `termux-tts-speak` (app
@@ -34,12 +39,23 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-Aucune dépendance à installer pour MonIA lui-même. Pour le chat, installe
-[Ollama](https://ollama.com) séparément et récupère un modèle :
+Aucune dépendance à installer pour MonIA lui-même.
+
+### Option recommandée : Groq (cloud, gratuit, rapide, vraiment capable)
+
+1. Crée un compte gratuit sur [console.groq.com](https://console.groq.com)
+2. Génère une clé API
+3. `export GROQ_API_KEY=ta_cle` (ajoute-le à `~/.bashrc` pour ne pas le
+   retaper à chaque fois)
+
+Aucune charge sur la RAM du téléphone : la question part sur internet, le
+modèle tourne chez Groq, seule la réponse revient.
+
+### Option locale : Ollama (marche hors-ligne, mais limité par la RAM)
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull llama3.2:1b   # modele leger, adapte a un telephone
+ollama pull llama3.2:1b   # ou qwen2.5:0.5b si la RAM est trop juste
 ```
 
 Pas besoin de lancer `ollama serve` toi-même : MonIA détecte qu'Ollama
@@ -48,6 +64,11 @@ démarrage (et retente juste avant chaque `chat` si besoin). Ça ne survit
 pas à Android qui tue les processus en arrière-plan après un long moment
 d'inactivité — dans ce cas MonIA le relance automatiquement au prochain
 `chat`.
+
+**Attention a la RAM** : un modèle local, meme petit, prend facilement
+1 a 1.5 Go. Verifie ce qu'il te reste avec `free -h` avant de choisir la
+taille du modèle. Si `GROQ_API_KEY` est configurée, Ollama n'est meme pas
+sollicite -- Groq est toujours essaye en premier.
 
 ## Utilisation
 
@@ -101,8 +122,8 @@ pip install pytest
 pytest
 ```
 
-Le client Ollama est testé contre un vrai serveur HTTP de test (pas un
-mock qui triche) qui imite l'API `/api/chat` et `/api/tags`, y compris le
-démarrage automatique (`ensure_running`). La CLI est testée de bout en
-bout : chat, notes, devis, recherche, projets, dessin, et le menu
-numéroté.
+Les clients Ollama et Groq sont testés contre de vrais serveurs HTTP de
+test (pas des mocks qui trichent) imitant leurs API respectives, y
+compris le démarrage automatique d'Ollama (`ensure_running`) et le repli
+Groq -> Ollama en cas d'erreur. La CLI est testée de bout en bout : chat,
+notes, devis, recherche, projets, dessin, et le menu numéroté.

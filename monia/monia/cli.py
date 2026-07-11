@@ -1,10 +1,10 @@
 import sys
 
-from . import devis, digits, llm_local, secondcerveau, voice
+from . import devis, digits, llm_cloud, llm_local, secondcerveau, voice
 
 HELP = """
 Commandes :
-  chat <message>                    parle avec le LLM local (Ollama)
+  chat <message>                    parle avec l'IA (Groq si une cle est configuree, sinon Ollama local)
   projet <nom>                      change le projet actif (memoire separee par projet)
   note <titre>                      sauvegarde une note (contenu demande ensuite, ligne vide pour finir)
   notes [projet]                    liste les notes d'un projet (celui actif par defaut)
@@ -115,23 +115,36 @@ def handle_command(session: Session, line: str, source=None) -> bool:
         if not rest:
             print("Usage: chat <message>")
             return True
-        if not llm_local.is_available():
-            print("Ollama non joignable, tentative de demarrage automatique...")
-            if not llm_local.ensure_running():
-                print(
-                    "Echec du demarrage automatique. Installe/lance Ollama toi-meme : "
-                    "`ollama serve &` puis `ollama pull llama3.2`."
-                )
-                return True
-            print("Ollama est pret.")
+
         session.history.append({"role": "user", "content": rest})
         secondcerveau.append_conversation(session.project, "user", rest)
-        try:
-            reply = llm_local.chat(session.history)
-        except llm_local.OllamaError as exc:
-            print(f"Erreur: {exc}")
-            session.history.pop()
-            return True
+
+        reply = None
+        if llm_cloud.has_api_key():
+            try:
+                reply = llm_cloud.chat(session.history)
+            except llm_cloud.GroqError as exc:
+                print(f"Erreur Groq: {exc}")
+                print("Repli sur le LLM local...")
+
+        if reply is None:
+            if not llm_local.is_available():
+                print("Ollama non joignable, tentative de demarrage automatique...")
+                if not llm_local.ensure_running():
+                    print(
+                        "Echec du demarrage automatique. Installe/lance Ollama toi-meme : "
+                        "`ollama serve &` puis `ollama pull llama3.2`."
+                    )
+                    session.history.pop()
+                    return True
+                print("Ollama est pret.")
+            try:
+                reply = llm_local.chat(session.history)
+            except llm_local.OllamaError as exc:
+                print(f"Erreur: {exc}")
+                session.history.pop()
+                return True
+
         session.history.append({"role": "assistant", "content": reply})
         secondcerveau.append_conversation(session.project, "assistant", reply)
         print(reply)
@@ -233,7 +246,9 @@ def run(input_lines=None) -> None:
     print("MonIA - assistant personnel")
     print(MENU)
 
-    if llm_local.is_available():
+    if llm_cloud.has_api_key():
+        print("(Chat : Groq configure, pas besoin d'Ollama)")
+    elif llm_local.is_available():
         print("(Ollama deja disponible)")
     elif llm_local.is_installed():
         print("(Ollama installe mais pas lance, demarrage automatique...)")
@@ -242,7 +257,10 @@ def run(input_lines=None) -> None:
         else:
             print("Echec du demarrage automatique. Tu pourras reessayer avec 'chat'.")
     else:
-        print("(Ollama n'est pas installe : la commande 'chat' restera indisponible)")
+        print(
+            "(Ollama n'est pas installe et aucune cle Groq configuree : "
+            "'chat' restera indisponible)"
+        )
 
     while True:
         try:
