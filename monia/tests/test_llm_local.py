@@ -68,3 +68,52 @@ def test_chat_returns_reply_content(mock_ollama):
 def test_chat_raises_ollama_error_when_unreachable():
     with pytest.raises(llm_local.OllamaError):
         llm_local.chat([{"role": "user", "content": "x"}], host="http://127.0.0.1:1", timeout=1)
+
+
+def test_ensure_running_skips_launch_when_already_available(monkeypatch, mock_ollama):
+    called = []
+    monkeypatch.setattr(llm_local.subprocess, "Popen", lambda *a, **kw: called.append((a, kw)))
+    assert llm_local.ensure_running(host=mock_ollama) is True
+    assert called == []  # no need to spawn anything, it was already up
+
+
+def test_ensure_running_returns_false_when_ollama_not_installed(monkeypatch):
+    monkeypatch.setattr(llm_local, "is_installed", lambda: False)
+    assert llm_local.ensure_running(host="http://127.0.0.1:1", startup_timeout=1) is False
+
+
+def test_ensure_running_launches_and_waits_until_reachable(monkeypatch):
+    monkeypatch.setattr(llm_local, "is_installed", lambda: True)
+    popen_calls = []
+    monkeypatch.setattr(
+        llm_local.subprocess, "Popen", lambda *a, **kw: popen_calls.append((a, kw))
+    )
+
+    availability_sequence = [False, False, True]
+
+    def fake_is_available(host=None, timeout=None):
+        return availability_sequence.pop(0) if availability_sequence else True
+
+    monkeypatch.setattr(llm_local, "is_available", fake_is_available)
+    monkeypatch.setattr(llm_local.time, "sleep", lambda _seconds: None)  # skip real waiting
+
+    assert llm_local.ensure_running(host="http://127.0.0.1:1", startup_timeout=5) is True
+    assert len(popen_calls) == 1
+    assert popen_calls[0][0] == (["ollama", "serve"],)
+
+
+def test_ensure_running_gives_up_after_timeout(monkeypatch):
+    monkeypatch.setattr(llm_local, "is_installed", lambda: True)
+    monkeypatch.setattr(llm_local.subprocess, "Popen", lambda *a, **kw: None)
+    monkeypatch.setattr(llm_local, "is_available", lambda host=None, timeout=None: False)
+
+    real_monotonic = llm_local.time.monotonic
+    fake_time = [real_monotonic()]
+    monkeypatch.setattr(llm_local.time, "monotonic", lambda: fake_time[0])
+
+    def fake_sleep(_seconds):
+        fake_time[0] += 1.0  # advance the fake clock past the deadline quickly
+
+    monkeypatch.setattr(llm_local.time, "sleep", fake_sleep)
+
+    assert llm_local.ensure_running(host="http://127.0.0.1:1", startup_timeout=3) is False

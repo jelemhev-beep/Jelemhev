@@ -38,10 +38,16 @@ Aucune dépendance à installer pour MonIA lui-même. Pour le chat, installe
 [Ollama](https://ollama.com) séparément et récupère un modèle :
 
 ```bash
-# une fois Ollama installé
-ollama serve &
-ollama pull llama3.2
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull llama3.2:1b   # modele leger, adapte a un telephone
 ```
+
+Pas besoin de lancer `ollama serve` toi-même : MonIA détecte qu'Ollama
+n'est pas démarré et le lance automatiquement en arrière-plan au
+démarrage (et retente juste avant chaque `chat` si besoin). Ça ne survit
+pas à Android qui tue les processus en arrière-plan après un long moment
+d'inactivité — dans ce cas MonIA le relance automatiquement au prochain
+`chat`.
 
 ## Utilisation
 
@@ -49,23 +55,36 @@ ollama pull llama3.2
 python3 -m monia
 ```
 
-```
-MonIA - assistant personnel (tape 'aide' pour les commandes)
-> projet Jardin
-> devis gravier 20 5
-> note Idee amenagement
-Prevoir une terrasse en bois
-Ajouter un massif de fleurs
+Un menu numéroté s'affiche au démarrage — tape un chiffre, ou une commande
+complète si tu préfères :
 
-> chat comment reussir une terrasse en bois ?
-> voix on
-> recherche terrasse
-> dessin
-line 4 14 23 14
-predict
-quit
-> quitter
 ```
+=== MonIA ===
+  1) Discuter avec le LLM local
+  2) Changer de projet actif
+  3) Prendre une note
+  4) Voir mes notes
+  5) Rechercher dans le second cerveau
+  6) Calculer un devis
+  7) Voir les materiaux disponibles
+  8) Dessiner un chiffre (reconnaissance neuralnet)
+  9) Activer/desactiver la voix
+  0) Quitter
+
+> 6
+Materiau, surface en m2, epaisseur en cm (optionnel) : gravier 20 5
+Materiau      : gravier
+Surface       : 20 m2
+...
+
+> 1
+Ton message : comment reussir une terrasse en bois ?
+...
+```
+
+Les commandes complètes marchent toujours en parallèle du menu (`chat ...`,
+`devis ...`, `dessin`, `voix on|off`, `note ...`, etc.) — tape `aide` pour
+tout revoir.
 
 Chaque `devis`, `chat` et `dessin` reconnu est automatiquement sauvegardé
 dans le second cerveau du projet actif — rien ne se perd en fermant le
@@ -83,5 +102,7 @@ pytest
 ```
 
 Le client Ollama est testé contre un vrai serveur HTTP de test (pas un
-mock qui triche) qui imite l'API `/api/chat` et `/api/tags`. La CLI est
-testée de bout en bout : chat, notes, devis, recherche, projets.
+mock qui triche) qui imite l'API `/api/chat` et `/api/tags`, y compris le
+démarrage automatique (`ensure_running`). La CLI est testée de bout en
+bout : chat, notes, devis, recherche, projets, dessin, et le menu
+numéroté.

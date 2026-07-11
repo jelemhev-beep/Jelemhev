@@ -17,12 +17,67 @@ Commandes :
   quitter                           quitte
 """
 
+MENU = """
+=== MonIA ===
+  1) Discuter avec le LLM local
+  2) Changer de projet actif
+  3) Prendre une note
+  4) Voir mes notes
+  5) Rechercher dans le second cerveau
+  6) Calculer un devis
+  7) Voir les materiaux disponibles
+  8) Dessiner un chiffre (reconnaissance neuralnet)
+  9) Activer/desactiver la voix
+  0) Quitter
+
+Tape un numero, ou une commande complete (ex: "chat bonjour"). 'aide' pour revoir tout ca.
+"""
+
+# number -> (command, prompt). Commands needing no extra input aren't listed
+# here; they're handled directly in _expand_menu_choice.
+_PROMPTED_CHOICES = {
+    "1": ("chat", "Ton message : "),
+    "2": ("projet", "Nom du projet : "),
+    "3": ("note", "Titre de la note : "),
+    "5": ("recherche", "Terme a chercher : "),
+    "6": ("devis", "Materiau, surface en m2, epaisseur en cm (optionnel) : "),
+    "9": ("voix", "on ou off : "),
+}
+_DIRECT_CHOICES = {
+    "0": "quitter",
+    "4": "notes",
+    "7": "materiaux",
+    "8": "dessin",
+}
+
 
 class Session:
     def __init__(self):
         self.project = "General"
         self.voice_enabled = False
         self.history: list[dict] = []
+
+
+def _expand_menu_choice(line: str, read_line) -> str:
+    """Turns a bare menu number into the equivalent full command, prompting
+    for any extra argument it needs. Anything that isn't a recognized menu
+    number is returned unchanged (so raw commands keep working too)."""
+    choice = line.strip().lower()
+
+    if choice == "menu":
+        print(MENU)
+        return "aide"
+
+    if choice in _DIRECT_CHOICES:
+        return _DIRECT_CHOICES[choice]
+
+    if choice in _PROMPTED_CHOICES:
+        cmd, prompt = _PROMPTED_CHOICES[choice]
+        print(prompt, end="")
+        value = read_line().strip()
+        return f"{cmd} {value}" if value else cmd
+
+    return line
 
 
 def handle_command(session: Session, line: str, source=None) -> bool:
@@ -47,6 +102,7 @@ def handle_command(session: Session, line: str, source=None) -> bool:
         return False
 
     elif cmd in ("aide", "help"):
+        print(MENU)
         print(HELP)
 
     elif cmd == "projet":
@@ -59,6 +115,15 @@ def handle_command(session: Session, line: str, source=None) -> bool:
         if not rest:
             print("Usage: chat <message>")
             return True
+        if not llm_local.is_available():
+            print("Ollama non joignable, tentative de demarrage automatique...")
+            if not llm_local.ensure_running():
+                print(
+                    "Echec du demarrage automatique. Installe/lance Ollama toi-meme : "
+                    "`ollama serve &` puis `ollama pull llama3.2`."
+                )
+                return True
+            print("Ollama est pret.")
         session.history.append({"role": "user", "content": rest})
         secondcerveau.append_conversation(session.project, "user", rest)
         try:
@@ -165,9 +230,19 @@ def run(input_lines=None) -> None:
             return next(source)
         return input()
 
-    print("MonIA - assistant personnel (tape 'aide' pour les commandes)")
-    if not llm_local.is_available():
-        print("(Ollama n'est pas joignable : la commande 'chat' ne marchera pas tant qu'il n'est pas lance)")
+    print("MonIA - assistant personnel")
+    print(MENU)
+
+    if llm_local.is_available():
+        print("(Ollama deja disponible)")
+    elif llm_local.is_installed():
+        print("(Ollama installe mais pas lance, demarrage automatique...)")
+        if llm_local.ensure_running():
+            print("Ollama est pret.")
+        else:
+            print("Echec du demarrage automatique. Tu pourras reessayer avec 'chat'.")
+    else:
+        print("(Ollama n'est pas installe : la commande 'chat' restera indisponible)")
 
     while True:
         try:
@@ -176,6 +251,7 @@ def run(input_lines=None) -> None:
             break
         if not line:
             continue
+        line = _expand_menu_choice(line, read_line)
         if not handle_command(session, line, source):
             break
 
