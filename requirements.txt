@@ -1,0 +1,7 @@
+# MonIA fonctionne avec la seule bibliothèque standard de Python 3.
+# Ces dépendances sont optionnelles et n'activent que certaines options :
+#
+#   llama-cpp-python   -> option 45 (LLM local Qwen2.5 .gguf)
+#   PySocks            -> option 34 (navigation via Tor)
+#
+# pip install llama-cpp-python PySocks
